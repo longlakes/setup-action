@@ -1,0 +1,39 @@
+name: Integration Test
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run setup-action
+        uses: ./
+        with:
+          token: ${{ secrets.REWIRE_TOKEN }}
+          endpoint: ${{ env.REWIRE_ENDPOINT || 'https://app.rewire.dev/otlp/v1' }}
+          hostmetrics: "true"
+          node-options: "true"
+
+      - name: Verify OTEL env vars exported
+        run: |
+          [ -n "$OTEL_EXPORTER_OTLP_ENDPOINT" ] || (echo "MISSING OTEL_EXPORTER_OTLP_ENDPOINT" && exit 1)
+          [ -n "$OTEL_SERVICE_NAME" ] || (echo "MISSING OTEL_SERVICE_NAME" && exit 1)
+          echo "OTEL_EXPORTER_OTLP_ENDPOINT=$OTEL_EXPORTER_OTLP_ENDPOINT"
+          echo "OTEL_SERVICE_NAME=$OTEL_SERVICE_NAME"
+          echo "NODE_OPTIONS=$NODE_OPTIONS"
+
+      - name: Verify collector health endpoint
+        run: curl --retry 5 --retry-delay 2 --fail http://localhost:13133/
+
+      - name: Send test span
+        run: |
+          curl -sf -X POST "$OTEL_EXPORTER_OTLP_ENDPOINT/v1/traces" \
+            -H "Content-Type: application/json" \
+            -d '{"resourceSpans":[]}'
+
+      - name: Tail collector logs
+        if: always()
+        run: sleep 3 && cat /tmp/otelcol.log || true

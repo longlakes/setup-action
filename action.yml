@@ -1,0 +1,32 @@
+name: "Rewire Setup"
+description: "Start OpenTelemetry collector sidecar for Rewire observability"
+author: "longlakes"
+
+inputs:
+  token:
+    description: "Rewire API key (Bearer token for the OTLP endpoint)"
+    required: true
+  endpoint:
+    description: "Rewire OTLP HTTP endpoint"
+    required: false
+    default: "https://app.rewire.dev/otlp/v1"
+  collector-version:
+    description: "otelcol-contrib version to install"
+    required: false
+    default: "0.123.0"
+  hostmetrics:
+    description: "Enable host metrics receiver (CPU/memory/disk/network)"
+    required: false
+    default: "true"
+  node-options:
+    description: "Append @rewire/node/register to NODE_OPTIONS for zero-config Node.js instrumentation"
+    required: false
+    default: "true"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
+
+branding:
+  icon: "activity"
+  color: "blue"
