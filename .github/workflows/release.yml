@@ -1,0 +1,39 @@
+name: Release
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Commit updated dist
+        run: |
+          git config user.name "longlakes"
+          git config user.email "jordan+longlakes@stephens.io"
+          git add dist/index.js dist/package.json
+          git diff --staged --quiet || git commit -m "chore: build dist for release ${{ github.ref_name }}"
+
+      - name: Update floating major tag (e.g. v1)
+        run: |
+          MAJOR=$(echo "${{ github.ref_name }}" | sed 's/\..*//')
+          git tag -f "$MAJOR"
+          git push origin "$MAJOR" --force
+
+      - name: Push release commit
+        run: git push origin HEAD:main
