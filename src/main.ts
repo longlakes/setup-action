@@ -10,7 +10,7 @@ async function main() {
   const opts = {
     version: core.getInput("collector-version") || DEFAULT_VERSION,
     endpoint:
-      core.getInput("endpoint") || "https://app.rewire.dev/otlp/v1",
+      core.getInput("endpoint") || "https://app.rewire.dev/otlp",
     token: core.getInput("token", { required: true }),
     hostmetrics: core.getBooleanInput("hostmetrics"),
     nodeOptions: core.getBooleanInput("node-options"),

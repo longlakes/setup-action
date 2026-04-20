@@ -38519,7 +38519,7 @@ const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(impo
 async function main() {
     const opts = {
         version: getInput("collector-version") || DEFAULT_VERSION,
-        endpoint: getInput("endpoint") || "https://app.rewire.dev/otlp/v1",
+        endpoint: getInput("endpoint") || "https://app.rewire.dev/otlp",
         token: getInput("token", { required: true }),
         hostmetrics: getBooleanInput("hostmetrics"),
         nodeOptions: getBooleanInput("node-options"),
