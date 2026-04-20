@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { createReadStream, openSync } from "node:fs";
+import { chmod } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { openSync } from "node:fs";
 import { buildCollectorConfig } from "./config.js";
 import type {
   AssetInfo,
@@ -171,6 +171,7 @@ export async function run(opts: InstallerOptions): Promise<Record<string, string
   const configPath = "/tmp/otelcol-config.yml";
 
   const binaryPath = await downloadCollector(opts);
+  await chmod(binaryPath, 0o755).catch(() => {}); // ensure executable on cache hit or fresh download
   await writeCollectorConfig(configPath, opts, writeFile);
   startCollector(binaryPath, configPath, execDetached);
   await pollHealth(HEALTH_URL, 30_000, httpGet, sleep);

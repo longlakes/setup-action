@@ -19,9 +19,7 @@ async function main() {
       // src is the downloaded .tar.gz; extract it, cache the dir, return binary path
       const extractedDir = await tc.extractTar(src);
       const cachedDir = await tc.cacheDir(extractedDir, name, version);
-      const binary = join(cachedDir, name);
-      await fs.chmod(binary, 0o755);
-      return binary;
+      return join(cachedDir, name);
     },
     findInCache: (name: string, version: string) => {
       const dir = tc.find(name, version);

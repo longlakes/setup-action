@@ -34455,6 +34455,8 @@ function _unique(values) {
 var external_node_crypto_ = __nccwpck_require__(7598);
 ;// CONCATENATED MODULE: external "node:fs"
 const external_node_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs");
+;// CONCATENATED MODULE: external "node:fs/promises"
+const promises_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs/promises");
 ;// CONCATENATED MODULE: external "node:child_process"
 const external_node_child_process_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:child_process");
 ;// CONCATENATED MODULE: ./node_modules/js-yaml/dist/js-yaml.mjs
@@ -38486,6 +38488,7 @@ async function run(opts) {
     const { writeFile = async () => { throw new Error("writeFile not provided"); }, execDetached = () => { throw new Error("execDetached not provided"); }, httpGet = async (url) => { const r = await fetch(url); return { status: r.status }; }, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), } = opts;
     const configPath = "/tmp/otelcol-config.yml";
     const binaryPath = await downloadCollector(opts);
+    await (0,promises_namespaceObject.chmod)(binaryPath, 0o755).catch(() => { }); // ensure executable on cache hit or fresh download
     await writeCollectorConfig(configPath, opts, writeFile);
     startCollector(binaryPath, configPath, execDetached);
     await pollHealth(HEALTH_URL, 30_000, httpGet, sleep);
@@ -38525,9 +38528,7 @@ async function main() {
             // src is the downloaded .tar.gz; extract it, cache the dir, return binary path
             const extractedDir = await extractTar(src);
             const cachedDir = await cacheDir(extractedDir, name, version);
-            const binary = (0,external_node_path_namespaceObject.join)(cachedDir, name);
-            await external_node_fs_namespaceObject.promises.chmod(binary, 0o755);
-            return binary;
+            return (0,external_node_path_namespaceObject.join)(cachedDir, name);
         },
         findInCache: (name, version) => {
             const dir = find(name, version);
