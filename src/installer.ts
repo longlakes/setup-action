@@ -16,7 +16,7 @@ import type {
 
 export const COLLECTOR_LOG_PATH = "/tmp/otelcol.log";
 export const HEALTH_URL = "http://localhost:13133";
-export const DEFAULT_VERSION = "0.123.0";
+export const DEFAULT_VERSION = "0.114.0";
 
 export function resolvePlatform(): Platform {
   const { platform, arch } = process;
@@ -36,7 +36,7 @@ export function resolveAssetInfo(
   platform: Platform,
 ): AssetInfo {
   const assetName = `otelcol-contrib_${version}_${platform.os}_${platform.arch}.tar.gz`;
-  const checksumsName = `otelcol-contrib_${version}_checksums.txt`;
+  const checksumsName = `opentelemetry-collector-releases_otelcol-contrib_checksums.txt`;
   const base = `https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${version}`;
   return {
     assetName,

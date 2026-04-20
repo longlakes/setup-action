@@ -38382,7 +38382,7 @@ function buildCollectorConfig(opts) {
 
 const COLLECTOR_LOG_PATH = "/tmp/otelcol.log";
 const HEALTH_URL = "http://localhost:13133";
-const DEFAULT_VERSION = "0.123.0";
+const DEFAULT_VERSION = "0.114.0";
 function resolvePlatform() {
     const { platform, arch } = process;
     if (platform !== "linux" && platform !== "darwin") {
@@ -38397,7 +38397,7 @@ function resolvePlatform() {
 }
 function resolveAssetInfo(version, platform) {
     const assetName = `otelcol-contrib_${version}_${platform.os}_${platform.arch}.tar.gz`;
-    const checksumsName = `otelcol-contrib_${version}_checksums.txt`;
+    const checksumsName = `opentelemetry-collector-releases_otelcol-contrib_checksums.txt`;
     const base = `https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${version}`;
     return {
         assetName,
