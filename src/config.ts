@@ -28,7 +28,8 @@ export function buildCollectorConfig(opts: CollectorConfigOptions): string {
         { key: "git.commit.sha", value: "${env:GITHUB_SHA}", action: "insert" },
       ],
     },
-    batch: { timeout: "1s" },
+    // Short timeout so spans are flushed before the job container exits.
+    batch: { timeout: "200ms" },
   };
 
   const exporters = {

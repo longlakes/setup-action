@@ -55,7 +55,9 @@ describe("resolveAssetInfo", () => {
 
   it("builds correct checksums filename", () => {
     const info = resolveAssetInfo(version, { os: "linux", arch: "amd64" });
-    expect(info.checksumsName).toBe("otelcol-contrib_0.100.0_checksums.txt");
+    expect(info.checksumsName).toBe(
+      "opentelemetry-collector-releases_otelcol-contrib_checksums.txt",
+    );
   });
 
   it("builds download URL with v-prefixed version in path, no v in filename", () => {
@@ -68,7 +70,7 @@ describe("resolveAssetInfo", () => {
   it("builds checksums URL with v-prefixed version in path", () => {
     const info = resolveAssetInfo(version, { os: "linux", arch: "amd64" });
     expect(info.checksumsUrl).toBe(
-      "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.100.0/otelcol-contrib_0.100.0_checksums.txt",
+      "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.100.0/opentelemetry-collector-releases_otelcol-contrib_checksums.txt",
     );
   });
 });
