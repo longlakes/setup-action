@@ -104,12 +104,12 @@ export async function writeCollectorConfig(
   await writeFile(configPath, content);
 }
 
-export function startCollector(
+export async function startCollector(
   binaryPath: string,
   configPath: string,
   execDetached: ExecDetachedFn,
-): void {
-  execDetached(binaryPath, ["--config", configPath], COLLECTOR_LOG_PATH);
+): Promise<void> {
+  await execDetached(binaryPath, ["--config", configPath], COLLECTOR_LOG_PATH);
 }
 
 export async function pollHealth(
@@ -173,20 +173,33 @@ export async function run(opts: InstallerOptions): Promise<Record<string, string
   const binaryPath = await downloadCollector(opts);
   await chmod(binaryPath, 0o755).catch(() => {}); // ensure executable on cache hit or fresh download
   await writeCollectorConfig(configPath, opts, writeFile);
-  startCollector(binaryPath, configPath, execDetached);
+  await startCollector(binaryPath, configPath, execDetached);
   await pollHealth(HEALTH_URL, 30_000, httpGet, sleep);
 
   return buildEnvVars({ nodeOptions: opts.nodeOptions });
 }
 
-// Real execDetached implementation — used by main.ts
-export function makeExecDetached(): ExecDetachedFn {
-  return (cmd, args, logPath) => {
+// Real execDetached implementation — used by main.ts.
+// Retries on ETXTBSY, which occurs when parallel act jobs race to exec a binary
+// that another container is still writing to the shared tool cache volume.
+export function makeExecDetached(sleep: SleepFn = (ms) => new Promise((r) => setTimeout(r, ms))): ExecDetachedFn {
+  return async (cmd, args, logPath) => {
     const out = openSync(logPath, "a");
-    const child = spawn(cmd, args, {
-      detached: true,
-      stdio: ["ignore", out, out],
-    });
-    child.unref();
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const child = spawn(cmd, args, {
+          detached: true,
+          stdio: ["ignore", out, out],
+        });
+        child.unref();
+        return;
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code !== "ETXTBSY") throw err;
+        lastErr = err;
+        await sleep(200 * (attempt + 1));
+      }
+    }
+    throw lastErr;
   };
 }

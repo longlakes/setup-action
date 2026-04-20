@@ -38445,8 +38445,8 @@ async function writeCollectorConfig(configPath, opts, writeFile) {
     const content = buildCollectorConfig(opts);
     await writeFile(configPath, content);
 }
-function startCollector(binaryPath, configPath, execDetached) {
-    execDetached(binaryPath, ["--config", configPath], COLLECTOR_LOG_PATH);
+async function startCollector(binaryPath, configPath, execDetached) {
+    await execDetached(binaryPath, ["--config", configPath], COLLECTOR_LOG_PATH);
 }
 async function pollHealth(url, timeoutMs, httpGet, sleep) {
     const deadline = Date.now() + timeoutMs;
@@ -38490,19 +38490,34 @@ async function run(opts) {
     const binaryPath = await downloadCollector(opts);
     await (0,promises_namespaceObject.chmod)(binaryPath, 0o755).catch(() => { }); // ensure executable on cache hit or fresh download
     await writeCollectorConfig(configPath, opts, writeFile);
-    startCollector(binaryPath, configPath, execDetached);
+    await startCollector(binaryPath, configPath, execDetached);
     await pollHealth(HEALTH_URL, 30_000, httpGet, sleep);
     return buildEnvVars({ nodeOptions: opts.nodeOptions });
 }
-// Real execDetached implementation — used by main.ts
-function makeExecDetached() {
-    return (cmd, args, logPath) => {
+// Real execDetached implementation — used by main.ts.
+// Retries on ETXTBSY, which occurs when parallel act jobs race to exec a binary
+// that another container is still writing to the shared tool cache volume.
+function makeExecDetached(sleep = (ms) => new Promise((r) => setTimeout(r, ms))) {
+    return async (cmd, args, logPath) => {
         const out = (0,external_node_fs_namespaceObject.openSync)(logPath, "a");
-        const child = (0,external_node_child_process_namespaceObject.spawn)(cmd, args, {
-            detached: true,
-            stdio: ["ignore", out, out],
-        });
-        child.unref();
+        let lastErr;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            try {
+                const child = (0,external_node_child_process_namespaceObject.spawn)(cmd, args, {
+                    detached: true,
+                    stdio: ["ignore", out, out],
+                });
+                child.unref();
+                return;
+            }
+            catch (err) {
+                if (err.code !== "ETXTBSY")
+                    throw err;
+                lastErr = err;
+                await sleep(200 * (attempt + 1));
+            }
+        }
+        throw lastErr;
     };
 }
 
@@ -38535,7 +38550,7 @@ async function main() {
             return dir ? (0,external_node_path_namespaceObject.join)(dir, name) : "";
         },
         writeFile: (path, content) => external_node_fs_namespaceObject.promises.writeFile(path, content, "utf8"),
-        execDetached: makeExecDetached(),
+        execDetached: makeExecDetached((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
         httpGet: async (url) => {
             const res = await fetch(url);
             return { status: res.status };

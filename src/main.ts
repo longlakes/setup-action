@@ -27,7 +27,9 @@ async function main() {
     },
     writeFile: (path: string, content: string) =>
       fs.writeFile(path, content, "utf8"),
-    execDetached: makeExecDetached(),
+    execDetached: makeExecDetached(
+      (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    ),
     httpGet: async (url: string) => {
       const res = await fetch(url);
       return { status: res.status };

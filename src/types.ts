@@ -23,7 +23,7 @@ export type ExecDetachedFn = (
   cmd: string,
   args: string[],
   logPath: string,
-) => void;
+) => Promise<void>;
 export type DownloadFn = (url: string) => Promise<string>;
 export type CacheFn = (
   src: string,

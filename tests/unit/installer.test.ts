@@ -9,6 +9,7 @@ import {
   writeCollectorConfig,
   startCollector,
   pollHealth,
+  makeExecDetached,
   COLLECTOR_LOG_PATH,
 } from "../../src/installer.js";
 import type { InstallerOptions } from "../../src/types.js";
@@ -158,9 +159,9 @@ describe("writeCollectorConfig", () => {
 // --- startCollector ---
 
 describe("startCollector", () => {
-  it("calls execDetached with correct args and detached option", () => {
-    const execDetached = vi.fn();
-    startCollector(
+  it("calls execDetached with correct args and detached option", async () => {
+    const execDetached = vi.fn().mockResolvedValue(undefined);
+    await startCollector(
       "/usr/local/bin/otelcol-contrib",
       "/tmp/otelcol-config.yml",
       execDetached,
@@ -170,6 +171,85 @@ describe("startCollector", () => {
       ["--config", "/tmp/otelcol-config.yml"],
       COLLECTOR_LOG_PATH,
     );
+  });
+});
+
+// --- makeExecDetached ---
+
+vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, openSync: vi.fn().mockReturnValue(3) };
+});
+
+describe("makeExecDetached", async () => {
+  const { spawn: mockSpawn } = await import("node:child_process") as { spawn: ReturnType<typeof vi.fn> };
+  const sleep = vi.fn<[number], Promise<void>>();
+  const cmd = "/bin/otelcol-contrib";
+  const args = ["--config", "/tmp/config.yml"];
+  const logPath = "/tmp/otelcol.log";
+  const mockChild = { unref: vi.fn() };
+  const etxtbsy = Object.assign(new Error("spawn ETXTBSY"), { code: "ETXTBSY" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sleep.mockResolvedValue(undefined);
+  });
+
+  it("spawns successfully on first attempt", async () => {
+    mockSpawn.mockReturnValue(mockChild);
+
+    const execDetached = makeExecDetached(sleep);
+    await execDetached(cmd, args, logPath);
+
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    expect(mockChild.unref).toHaveBeenCalled();
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it("retries on ETXTBSY and succeeds on the next attempt", async () => {
+    mockSpawn.mockImplementationOnce(() => { throw etxtbsy; }).mockReturnValue(mockChild);
+
+    const execDetached = makeExecDetached(sleep);
+    await execDetached(cmd, args, logPath);
+
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(sleep).toHaveBeenCalledWith(200);
+  });
+
+  it("uses increasing backoff delays across retries", async () => {
+    mockSpawn
+      .mockImplementationOnce(() => { throw etxtbsy; })
+      .mockImplementationOnce(() => { throw etxtbsy; })
+      .mockImplementationOnce(() => { throw etxtbsy; })
+      .mockReturnValue(mockChild);
+
+    const execDetached = makeExecDetached(sleep);
+    await execDetached(cmd, args, logPath);
+
+    expect(sleep).toHaveBeenNthCalledWith(1, 200);
+    expect(sleep).toHaveBeenNthCalledWith(2, 400);
+    expect(sleep).toHaveBeenNthCalledWith(3, 600);
+  });
+
+  it("throws after 5 failed ETXTBSY attempts", async () => {
+    mockSpawn.mockImplementation(() => { throw etxtbsy; });
+
+    const execDetached = makeExecDetached(sleep);
+    await expect(execDetached(cmd, args, logPath)).rejects.toThrow("ETXTBSY");
+    expect(mockSpawn).toHaveBeenCalledTimes(5);
+    expect(sleep).toHaveBeenCalledTimes(5);
+  });
+
+  it("throws immediately on non-ETXTBSY errors without retrying", async () => {
+    const enoent = Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" });
+    mockSpawn.mockImplementation(() => { throw enoent; });
+
+    const execDetached = makeExecDetached(sleep);
+    await expect(execDetached(cmd, args, logPath)).rejects.toThrow("ENOENT");
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
   });
 });
 
