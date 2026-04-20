@@ -33212,14 +33212,14 @@ var exec_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arg
  */
 function exec_exec(commandLine, args, options) {
     return exec_awaiter(this, void 0, void 0, function* () {
-        const commandArgs = tr.argStringToArray(commandLine);
+        const commandArgs = argStringToArray(commandLine);
         if (commandArgs.length === 0) {
             throw new Error(`Parameter 'commandLine' cannot be null or empty.`);
         }
         // Path to tool to execute should be first arg
         const toolPath = commandArgs[0];
         args = commandArgs.slice(1).concat(args || []);
-        const runner = new tr.ToolRunner(toolPath, args, options);
+        const runner = new ToolRunner(toolPath, args, options);
         return runner.exec();
     });
 }
@@ -34029,9 +34029,9 @@ function extractTar(file_1, dest_1) {
         // Create dest
         dest = yield _createExtractFolder(dest);
         // Determine whether GNU tar
-        core.debug('Checking tar --version');
+        core_debug('Checking tar --version');
         let versionOutput = '';
-        yield exec('tar --version', [], {
+        yield exec_exec('tar --version', [], {
             ignoreReturnCode: true,
             silent: true,
             listeners: {
@@ -34039,7 +34039,7 @@ function extractTar(file_1, dest_1) {
                 stderr: (data) => (versionOutput += data.toString())
             }
         });
-        core.debug(versionOutput.trim());
+        core_debug(versionOutput.trim());
         const isGnuTar = versionOutput.toUpperCase().includes('GNU TAR');
         // Initialize args
         let args;
@@ -34049,7 +34049,7 @@ function extractTar(file_1, dest_1) {
         else {
             args = [flags];
         }
-        if (core.isDebug() && !flags.includes('v')) {
+        if (isDebug() && !flags.includes('v')) {
             args.push('-v');
         }
         let destArg = dest;
@@ -34067,7 +34067,7 @@ function extractTar(file_1, dest_1) {
             args.push('--overwrite');
         }
         args.push('-C', destArg, '-f', fileArg);
-        yield exec(`tar`, args);
+        yield exec_exec(`tar`, args);
         return dest;
     });
 }
@@ -34194,20 +34194,20 @@ function extractZipNix(file, dest) {
  */
 function cacheDir(sourceDir, tool, version, arch) {
     return tool_cache_awaiter(this, void 0, void 0, function* () {
-        version = semver.clean(version) || version;
-        arch = arch || os.arch();
-        core.debug(`Caching tool ${tool} ${version} ${arch}`);
-        core.debug(`source dir: ${sourceDir}`);
-        if (!fs.statSync(sourceDir).isDirectory()) {
+        version = node_modules_semver.clean(version) || version;
+        arch = arch || external_os_namespaceObject.arch();
+        core_debug(`Caching tool ${tool} ${version} ${arch}`);
+        core_debug(`source dir: ${sourceDir}`);
+        if (!external_fs_namespaceObject.statSync(sourceDir).isDirectory()) {
             throw new Error('sourceDir is not a directory');
         }
         // Create the tool dir
         const destPath = yield _createToolPath(tool, version, arch);
         // copy each child item. do not move. move can fail on Windows
         // due to anti-virus software having an open handle on a file.
-        for (const itemName of fs.readdirSync(sourceDir)) {
-            const s = path.join(sourceDir, itemName);
-            yield io.cp(s, destPath, { recursive: true });
+        for (const itemName of external_fs_namespaceObject.readdirSync(sourceDir)) {
+            const s = external_path_namespaceObject.join(sourceDir, itemName);
+            yield io_cp(s, destPath, { recursive: true });
         }
         // write .complete
         _completeToolPath(tool, version, arch);
@@ -34226,20 +34226,20 @@ function cacheDir(sourceDir, tool, version, arch) {
  */
 function cacheFile(sourceFile, targetFile, tool, version, arch) {
     return tool_cache_awaiter(this, void 0, void 0, function* () {
-        version = node_modules_semver.clean(version) || version;
-        arch = arch || external_os_namespaceObject.arch();
-        core_debug(`Caching tool ${tool} ${version} ${arch}`);
-        core_debug(`source file: ${sourceFile}`);
-        if (!external_fs_namespaceObject.statSync(sourceFile).isFile()) {
+        version = semver.clean(version) || version;
+        arch = arch || os.arch();
+        core.debug(`Caching tool ${tool} ${version} ${arch}`);
+        core.debug(`source file: ${sourceFile}`);
+        if (!fs.statSync(sourceFile).isFile()) {
             throw new Error('sourceFile is not a file');
         }
         // create the tool dir
         const destFolder = yield _createToolPath(tool, version, arch);
         // copy instead of move. move can fail on Windows due to
         // anti-virus software having an open handle on a file.
-        const destPath = external_path_namespaceObject.join(destFolder, targetFile);
-        core_debug(`destination file ${destPath}`);
-        yield io_cp(sourceFile, destPath);
+        const destPath = path.join(destFolder, targetFile);
+        core.debug(`destination file ${destPath}`);
+        yield io.cp(sourceFile, destPath);
         // write .complete
         _completeToolPath(tool, version, arch);
         return destFolder;
@@ -34352,9 +34352,9 @@ function _createExtractFolder(dest) {
     return tool_cache_awaiter(this, void 0, void 0, function* () {
         if (!dest) {
             // create a temp dir
-            dest = path.join(_getTempDirectory(), crypto.randomUUID());
+            dest = external_path_namespaceObject.join(_getTempDirectory(), external_crypto_namespaceObject.randomUUID());
         }
-        yield io.mkdirP(dest);
+        yield mkdirP(dest);
         return dest;
     });
 }
@@ -38503,9 +38503,12 @@ function makeExecDetached() {
     };
 }
 
+;// CONCATENATED MODULE: external "node:path"
+const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
 ;// CONCATENATED MODULE: ./src/main.ts
 // main.ts is the only file that imports @actions/core.
 // All logic lives in installer.ts and config.ts.
+
 
 
 
@@ -38518,8 +38521,18 @@ async function main() {
         hostmetrics: getBooleanInput("hostmetrics"),
         nodeOptions: getBooleanInput("node-options"),
         downloadFile: (url) => downloadTool(url),
-        cacheFile: (src, name, version) => cacheFile(src, name, name, version),
-        findInCache: (name, version) => find(name, version),
+        cacheFile: async (src, name, version) => {
+            // src is the downloaded .tar.gz; extract it, cache the dir, return binary path
+            const extractedDir = await extractTar(src);
+            const cachedDir = await cacheDir(extractedDir, name, version);
+            const binary = (0,external_node_path_namespaceObject.join)(cachedDir, name);
+            await external_node_fs_namespaceObject.promises.chmod(binary, 0o755);
+            return binary;
+        },
+        findInCache: (name, version) => {
+            const dir = find(name, version);
+            return dir ? (0,external_node_path_namespaceObject.join)(dir, name) : "";
+        },
         writeFile: (path, content) => external_node_fs_namespaceObject.promises.writeFile(path, content, "utf8"),
         execDetached: makeExecDetached(),
         httpGet: async (url) => {

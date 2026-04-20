@@ -4,6 +4,7 @@ import * as core from "@actions/core";
 import * as tc from "@actions/tool-cache";
 import { run, makeExecDetached, DEFAULT_VERSION } from "./installer.js";
 import { promises as fs } from "node:fs";
+import { join } from "node:path";
 
 async function main() {
   const opts = {
@@ -14,9 +15,18 @@ async function main() {
     hostmetrics: core.getBooleanInput("hostmetrics"),
     nodeOptions: core.getBooleanInput("node-options"),
     downloadFile: (url: string) => tc.downloadTool(url),
-    cacheFile: (src: string, name: string, version: string) =>
-      tc.cacheFile(src, name, name, version),
-    findInCache: (name: string, version: string) => tc.find(name, version),
+    cacheFile: async (src: string, name: string, version: string) => {
+      // src is the downloaded .tar.gz; extract it, cache the dir, return binary path
+      const extractedDir = await tc.extractTar(src);
+      const cachedDir = await tc.cacheDir(extractedDir, name, version);
+      const binary = join(cachedDir, name);
+      await fs.chmod(binary, 0o755);
+      return binary;
+    },
+    findInCache: (name: string, version: string) => {
+      const dir = tc.find(name, version);
+      return dir ? join(dir, name) : "";
+    },
     writeFile: (path: string, content: string) =>
       fs.writeFile(path, content, "utf8"),
     execDetached: makeExecDetached(),
