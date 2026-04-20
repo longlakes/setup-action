@@ -38344,7 +38344,7 @@ function buildCollectorConfig(opts) {
                 { key: "git.commit.sha", value: "${env:GITHUB_SHA}", action: "insert" },
             ],
         },
-        batch: { timeout: "5s" },
+        batch: { timeout: "1s" },
     };
     const exporters = {
         otlphttp: {
