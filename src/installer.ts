@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { createReadStream, openSync } from "node:fs";
-import { chmod } from "node:fs/promises";
+import { chmod, mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { join } from "node:path";
 import { buildCollectorConfig } from "./config.js";
 import type {
   AssetInfo,
@@ -138,26 +139,26 @@ export async function pollHealth(
   }
 }
 
-export function buildEnvVars(opts: {
-  nodeOptions: boolean;
-}): Record<string, string> {
-  const vars: Record<string, string> = {
+export function buildEnvVars(): Record<string, string> {
+  return {
     OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318",
     OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
     OTEL_SERVICE_NAME: process.env.GITHUB_REPOSITORY ?? "",
   };
+}
 
-  if (opts.nodeOptions) {
-    const register = "--require @rewire/node/register";
-    const existing = process.env.NODE_OPTIONS ?? "";
-    vars.NODE_OPTIONS = existing.includes(register)
-      ? existing
-      : existing
-        ? `${existing} ${register}`
-        : register;
-  }
+export const NODE_WRAPPER_DIR = "/tmp/rewire-node-wrapper";
 
-  return vars;
+export async function setupNodeWrapper(
+  nodeExecPath: string,
+  writeFile: WriteFn,
+): Promise<string> {
+  await mkdir(NODE_WRAPPER_DIR, { recursive: true });
+  const wrapperPath = join(NODE_WRAPPER_DIR, "node");
+  const script = `#!/bin/sh\nexec "${nodeExecPath}" --require @rewire/node/register "$@"\n`;
+  await writeFile(wrapperPath, script);
+  await chmod(wrapperPath, 0o755);
+  return NODE_WRAPPER_DIR;
 }
 
 export async function run(opts: InstallerOptions): Promise<Record<string, string>> {
@@ -176,7 +177,7 @@ export async function run(opts: InstallerOptions): Promise<Record<string, string
   await startCollector(binaryPath, configPath, execDetached);
   await pollHealth(HEALTH_URL, 30_000, httpGet, sleep);
 
-  return buildEnvVars({ nodeOptions: opts.nodeOptions });
+  return buildEnvVars();
 }
 
 // Real execDetached implementation — used by main.ts.

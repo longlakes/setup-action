@@ -10,7 +10,9 @@ import {
   startCollector,
   pollHealth,
   makeExecDetached,
+  setupNodeWrapper,
   COLLECTOR_LOG_PATH,
+  NODE_WRAPPER_DIR,
 } from "../../src/installer.js";
 import type { InstallerOptions } from "../../src/types.js";
 
@@ -250,6 +252,25 @@ describe("makeExecDetached", async () => {
     await expect(execDetached(cmd, args, logPath)).rejects.toThrow("ENOENT");
     expect(mockSpawn).toHaveBeenCalledTimes(1);
     expect(sleep).not.toHaveBeenCalled();
+  });
+});
+
+// --- setupNodeWrapper ---
+
+describe("setupNodeWrapper", () => {
+  it("writes a node shim script with --require flag and returns wrapper dir", async () => {
+    const { writeFile: realWriteFile, rm } = await import("node:fs/promises");
+    const writeFileSpy = vi.fn().mockImplementation(realWriteFile);
+    try {
+      const dir = await setupNodeWrapper("/usr/bin/node", writeFileSpy);
+      expect(dir).toBe(NODE_WRAPPER_DIR);
+      const [, script] = writeFileSpy.mock.calls[0] as [string, string];
+      expect(script).toContain('exec "/usr/bin/node"');
+      expect(script).toContain("--require @rewire/node/register");
+      expect(script).toContain('"$@"');
+    } finally {
+      await rm(NODE_WRAPPER_DIR, { recursive: true, force: true });
+    }
   });
 });
 

@@ -33420,12 +33420,12 @@ function core_setSecret(secret) {
 function addPath(inputPath) {
     const filePath = process.env['GITHUB_PATH'] || '';
     if (filePath) {
-        issueFileCommand('PATH', inputPath);
+        file_command_issueFileCommand('PATH', inputPath);
     }
     else {
-        issueCommand('add-path', {}, inputPath);
+        command_issueCommand('add-path', {}, inputPath);
     }
-    process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
+    process.env['PATH'] = `${inputPath}${external_path_namespaceObject.delimiter}${process.env['PATH']}`;
 }
 /**
  * Gets the value of an input.
@@ -34459,6 +34459,8 @@ const external_node_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import
 const promises_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs/promises");
 ;// CONCATENATED MODULE: external "node:child_process"
 const external_node_child_process_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:child_process");
+;// CONCATENATED MODULE: external "node:path"
+const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
 ;// CONCATENATED MODULE: ./node_modules/js-yaml/dist/js-yaml.mjs
 
 /*! js-yaml 4.1.1 https://github.com/nodeca/js-yaml @license MIT */
@@ -38383,6 +38385,7 @@ function buildCollectorConfig(opts) {
 
 
 
+
 const COLLECTOR_LOG_PATH = "/tmp/otelcol.log";
 const HEALTH_URL = "http://localhost:13133";
 const DEFAULT_VERSION = "0.114.0";
@@ -38468,22 +38471,21 @@ async function pollHealth(url, timeoutMs, httpGet, sleep) {
         delay = Math.min(delay * 2, 2000);
     }
 }
-function buildEnvVars(opts) {
-    const vars = {
+function buildEnvVars() {
+    return {
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318",
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
         OTEL_SERVICE_NAME: process.env.GITHUB_REPOSITORY ?? "",
     };
-    if (opts.nodeOptions) {
-        const register = "--require @rewire/node/register";
-        const existing = process.env.NODE_OPTIONS ?? "";
-        vars.NODE_OPTIONS = existing.includes(register)
-            ? existing
-            : existing
-                ? `${existing} ${register}`
-                : register;
-    }
-    return vars;
+}
+const NODE_WRAPPER_DIR = "/tmp/rewire-node-wrapper";
+async function setupNodeWrapper(nodeExecPath, writeFile) {
+    await (0,promises_namespaceObject.mkdir)(NODE_WRAPPER_DIR, { recursive: true });
+    const wrapperPath = (0,external_node_path_namespaceObject.join)(NODE_WRAPPER_DIR, "node");
+    const script = `#!/bin/sh\nexec "${nodeExecPath}" --require @rewire/node/register "$@"\n`;
+    await writeFile(wrapperPath, script);
+    await (0,promises_namespaceObject.chmod)(wrapperPath, 0o755);
+    return NODE_WRAPPER_DIR;
 }
 async function run(opts) {
     const { writeFile = async () => { throw new Error("writeFile not provided"); }, execDetached = () => { throw new Error("execDetached not provided"); }, httpGet = async (url) => { const r = await fetch(url); return { status: r.status }; }, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), } = opts;
@@ -38493,7 +38495,7 @@ async function run(opts) {
     await writeCollectorConfig(configPath, opts, writeFile);
     await startCollector(binaryPath, configPath, execDetached);
     await pollHealth(HEALTH_URL, 30_000, httpGet, sleep);
-    return buildEnvVars({ nodeOptions: opts.nodeOptions });
+    return buildEnvVars();
 }
 // Real execDetached implementation — used by main.ts.
 // Retries on ETXTBSY, which occurs when parallel act jobs race to exec a binary
@@ -38522,8 +38524,6 @@ function makeExecDetached(sleep = (ms) => new Promise((r) => setTimeout(r, ms)))
     };
 }
 
-;// CONCATENATED MODULE: external "node:path"
-const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
 ;// CONCATENATED MODULE: ./src/main.ts
 // main.ts is the only file that imports @actions/core.
 // All logic lives in installer.ts and config.ts.
@@ -38561,6 +38561,10 @@ async function main() {
     const envVars = await run(opts);
     for (const [key, value] of Object.entries(envVars)) {
         exportVariable(key, value);
+    }
+    if (opts.nodeOptions) {
+        const wrapperDir = await setupNodeWrapper(process.execPath, opts.writeFile);
+        addPath(wrapperDir);
     }
 }
 main().catch(setFailed);

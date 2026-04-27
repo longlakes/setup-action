@@ -2,7 +2,7 @@
 // All logic lives in installer.ts and config.ts.
 import * as core from "@actions/core";
 import * as tc from "@actions/tool-cache";
-import { run, makeExecDetached, DEFAULT_VERSION } from "./installer.js";
+import { run, makeExecDetached, setupNodeWrapper, DEFAULT_VERSION } from "./installer.js";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
 
@@ -42,6 +42,11 @@ async function main() {
 
   for (const [key, value] of Object.entries(envVars)) {
     core.exportVariable(key, value);
+  }
+
+  if (opts.nodeOptions) {
+    const wrapperDir = await setupNodeWrapper(process.execPath, opts.writeFile!);
+    core.addPath(wrapperDir);
   }
 }
 
